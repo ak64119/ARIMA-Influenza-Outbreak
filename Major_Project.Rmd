@@ -1,0 +1,901 @@
+---
+title: "CT5108_Data_Analytics_Project_18230051_Akshay_Kochhar"
+author: "Akshay Kochhar_18230051"
+date: "2 July 2019"
+output: html_document
+---
+
+
+```{r}
+###########################################################################################
+############################Load Required Libraries########################################
+###########################################################################################
+
+options(scipen = 999)    #prevent scientific notation
+library(tidyr)           #package to "tidy" data
+library(dplyr)           #transform and summarize tabular data
+library(forecast)        #provides tools for displaying and analysing time series forecasts
+library(tseries)         #time series analysis and computational finance
+library(uroot)           #analysing time series such as unit root tests
+library(ggplot2)         #Data Visualisations
+library("ggpubr")        #Data visualization for scatter plots
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+
+###########################################################################################
+############################Fetch Rainfall and Temperature data############################
+###########################################################################################
+
+##The code below fetches rainfall and temperature data from netCDF file and generates a 
+##csv file of that data.
+
+folder<- "F:/NUIG_Coursework/Data_Analytics_Project/Data/Surface_Temp/"
+file_stem <- "T2m_wrf_"
+year <- 2000:2016
+extn <- ".nc"
+dname <- "T_2m"
+leap_yr_col_Name <- list()
+non_leap_yr_col_Name <- list()
+
+for (i in year){
+  
+  leap_yr <- data.frame(a=1:366)
+  
+  non_leap_yr <- data.frame(a=1:365)
+
+  data <- paste0(folder,file_stem,as.character(i),extn)
+
+  ncin <- nc_open(data)
+  
+  tmp_array <- ncvar_get(ncin,dname)
+
+  fillvalue <- ncatt_get(ncin,dname,"_FillValue")
+
+  # replace netCDF empty values with NA's
+  tmp_array[tmp_array==fillvalue$value] <- NA
+
+  b <- list()
+
+  j <- 1
+  
+  if ((i == 2000)|(i == 2004)|(i == 2008)|(i == 2012)|(i == 2016)){
+
+    #Creates the daily average of the data
+    while (j <= 366){                           
+      a <- tmp_array[,,j]
+      b[j] <- (sum(a,na.rm=TRUE)/(nrow(a)*ncol(a)))
+      j =  j + 1
+      }
+    
+    #combining and saving the data in csv file
+    leap_yr <- cbind(leap_yr,data.frame(matrix(unlist(b), nrow=length(b), byrow=F)))
+    leap_yr_col_Name <- c("Day_Count",as.character(i))
+    colnames(leap_yr) <- leap_yr_col_Name
+    write.csv(leap_yr, file = paste0(file_stem,as.character(i),".csv") ,row.names=FALSE)
+    }
+  else{
+
+    while (j <= 365){
+        a <- tmp_array[,,j]
+        b[j] <- (sum(a,na.rm=TRUE)/(nrow(a)*ncol(a)))
+        j =  j + 1
+        }
+    
+    #combining and saving the data in csv file
+    non_leap_yr <- cbind(non_leap_yr,data.frame(matrix(unlist(b), nrow=length(b), byrow=F)))#
+    non_leap_yr_col_Name <- c("Day_Count",as.character(i))
+    colnames(non_leap_yr) <- non_leap_yr_col_Name
+    write.csv(non_leap_yr, file = paste0(file_stem,as.character(i),".csv") ,row.names=FALSE)
+  }
+
+}
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+
+###########################################################################################
+############################Fetch Rainfall and Temperature data############################
+####################################From Saved CDV File####################################
+
+##This code reads the data from saved CSV files and save it in a data frame.
+
+folder<- "C:/NUIG_Assignments/Project/"
+file_stem <- "T2m_wrf_"
+year <- 2005:2016
+extn <- ".csv"
+new_df <- data.frame()
+
+for (i in year){
+
+  addr <- paste0(folder,file_stem,as.character(i),extn)
+
+  values <- read.csv2(addr,sep = ",",header = FALSE,stringsAsFactors=FALSE)
+ 
+  values_df <- data.frame(values)
+  
+  new_df <- rbind(new_df,values_df)
+  
+  }
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+####################################Processign the Data####################################
+###########################################################################################
+
+##The code below is for processing the respective data.
+
+final_val <- new_df[new_df$V1 != "Day_Count",]
+
+final_val <- final_val[-(1:274),]
+
+final_val$week_grp <- rep(1:587, each = 7)
+
+final_val <- final_val[,-1]
+
+wekly_temp_mean <- final_val %>% group_by(week_grp) %>% summarize(wekly_temp_mean = mean(as.double(V2), na.rm = TRUE))
+
+wekly_temp_mean <- data.frame(wekly_temp_mean)
+
+write.csv2(wekly_temp_mean,"wekly_temp_mean.csv",sep=";")
+
+weather_data <- data.frame(cbind(wekly_rainfall_mean,wekly_temp_mean))
+
+weather_data <- weather_data[,-3]
+
+weather_data <- weather_data[-(557:587),]
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+
+###########################################################################################
+####################################Processign the Data####################################
+###########################################################################################
+
+##The code below is for processing the respective data.
+
+Influz_data <- read.csv2("IRE_Data.csv", sep=",")
+
+Influz_data <- Influz_data[-(1:166),]
+
+Influz_data <- Influz_data[,-(1:2)]
+
+Influz_data <- Influz_data[,-(3:14)]
+
+Influz_data <- Influz_data[,-7]
+
+Influz_data <- cbind(Influz_data,weather_data)
+
+Influz_data <- Influz_data[,-8]
+
+Influz_data <- Influz_data[,c(1,2,8,9,3,4,5,6,7)]
+
+write.csv(Influz_data,"Complete_data.csv",sep=";",row.names = FALSE)
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+####################################Processign the Data####################################
+###########################################################################################
+
+##The code below is for processing the respective data.
+
+comp_data <-  read.csv("Complete_data.csv")
+
+comp_data <- comp_data[-(1:13),]
+
+comp_data <- comp_data[-(522:543),]
+
+comp_data$week_num <- 1:556
+
+comp_data <- comp_data[,-(1:2)]
+
+comp_data <- comp_data[,c(10,1,2,3,4,5,6,7,8,9)]
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+###########################################################################################
+#################################Pearson correlation test##################################
+###########################################################################################
+
+
+##This code below checks the pearson correlation coefficient between ILI V/s Temperature 
+##and Rainfall
+
+corr_rain_ILI_test <- cor.test(comp_data$ILINumberOfCases_per_100000,
+                               comp_data$weekly_rainfll_mean,method = "pearson")
+
+corr_temp_ILI_test <- cor.test(comp_data$ILINumberOfCases_per_100000,
+                               comp_data$wekly_temp_mean,method = "pearson")
+
+corr_rain_ILI_test
+
+corr_temp_ILI_test
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+#################################Pearson correlation Scatter Plots#########################
+###########################################################################################
+
+
+##The code below is for generating Scatter Plots for Pearson Correlations.
+
+ggscatter(comp_data,
+          x = "weekly_rainfll_mean",
+          y = "ILINumberOfCases_per_100000", 
+          color = "black", shape = 21, size = 3, 
+          add = "reg.line", 
+          add.params = list(color = "blue", fill = "darkgray"),
+          conf.int = TRUE, 
+          cor.coef = TRUE, 
+          cor.method = "pearson",
+          xlab = "Weekly Avg. Rainfall (mm)", 
+          ylab = "ILI Number of Cases (per 100000)")
+
+ggscatter(comp_data, 
+          x = "wekly_temp_mean",
+          y = "ILINumberOfCases_per_100000", 
+          color = "black", shape = 21, size = 3, 
+          add = "reg.line", 
+          add.params = list(color = "blue", fill = "darkgray"),
+          conf.int = TRUE, 
+          cor.coef = TRUE, 
+          cor.method = "pearson",
+          xlab = "Weekly Avg. Temperature (Deg C)", 
+          ylab = "ILI Number of Cases (per 100000)")
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+###########################################################################################
+#################################Splitting the Data########################################
+###########################################################################################
+
+##The code below splits the data into test and training set.
+
+training_data <- comp_data[(1:378),]
+
+test_data <- comp_data[(379:556),]
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+
+```{r}
+
+###########################################################################################
+#################################Creating Time Series######################################
+###########################################################################################
+
+##The code below creates and visualises time series for rainfall data.
+
+rainfall.timeseries <- ts(training_data$weekly_rainfll_mean,c(2005,40),c(2012,52),52)
+
+autoplot(rainfall.timeseries) + 
+  xlab("Year") + ylab("Weekly Average Rainfall (mm)") +
+  ggtitle("4.1 || Time Series Weekly Average Rainfall (mm) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+###########################################################################################
+###########################################################################################
+
+##The code below creates and visualises time series for temperature data.
+
+mean.temp.timeseries <-ts(training_data$wekly_temp_mean,c(2005,40),c(2012,52),52)
+
+autoplot(mean.temp.timeseries) +
+  xlab("Year") + ylab("Weekly Average Temperature (Deg C)") +
+  ggtitle("4.2 || Time Series Weekly Average Temperature (Deg C) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+
+###########################################################################################
+###########################################################################################
+
+##The code below creates and visualises time series for ILI incidences counts
+
+ILI_Num_cases.timeseries <- ts(training_data$ILINumberOfCases_per_100000,
+                               c(2005,40),c(2012,52),52)
+
+autoplot(ILI_Num_cases.timeseries, xlab = "Year", ylab = "ILI Count (per 100,000)")  +
+  xlab("Year") + ylab("ILI Incidence Count (per 100,000)") +
+  ggtitle("4.3 || ILI Incidence Count (per 100,000) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r,fig.width=8}
+
+###########################################################################################
+#################################Cleaning Time Series######################################
+###########################################################################################
+
+##The code below cleanes and visualises time series data for rainfall data.
+
+clean.rainfall.timeseries <- tsclean(rainfall.timeseries)
+
+autoplot(clean.rainfall.timeseries) +
+  xlab("Year") + ylab("Weekly Average Rainfall (mm)") +
+  ggtitle("4.4 || Cleaned Time Series Weekly Average Rainfall (mm) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##The code below cleanes and visualises time series data for temperature data.
+
+clean.mean.temp.timeseries <- tsclean(mean.temp.timeseries)
+
+autoplot(clean.mean.temp.timeseries) +
+  xlab("Year") + ylab("Weekly Average Temperature (Deg C)") +
+  ggtitle("4.5 || Cleaned Time Series Weekly Average Temperature (Deg C) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##The code below cleans and visualises time series data for ILI incidences counts
+
+clean.ILI_Num_cases.timeseries <-  tsclean(ILI_Num_cases.timeseries)
+
+autoplot(clean.ILI_Num_cases.timeseries) +
+  xlab("Year") + ylab("ILI Incidence Count (per 100000)") +
+  ggtitle("4.6 || Cleaned ILI Incidence Count (per 100000) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r, fig.width=10}
+
+###########################################################################################
+#################################Smoothing Time Series#####################################
+###########################################################################################
+
+##The code below smoothes the time series with 12x12 MA and visualises time series data for 
+##rainfall data.
+
+autoplot(clean.rainfall.timeseries, series="Data") +
+  ##Soomthing is done in the code itself.
+  autolayer(ma(ma(clean.rainfall.timeseries,12),12), series="12x12-MA") + 
+  xlab("Year") + ylab("Weekly Average Rainfall (mm)") +
+  ggtitle("4.7 || Smoothed Cleaned Time Series Weekly Average Rainfall (mm) || Oct,2005 - Dec,2013") + 
+  scale_colour_manual(values=c("Data"="grey50","12x12-MA"="red"),
+                      breaks=c("Data","12x12-MA")) +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##The code below smoothes the time series with 12x12 MA and visualises time series data for 
+##temperature data.
+
+autoplot(clean.mean.temp.timeseries, series="Data") +
+  ##Soomthing is done in the code itself.
+  autolayer(ma(ma(clean.mean.temp.timeseries,12),12), series="12x12-MA") + 
+  xlab("Year") + ylab("Weekly Average Temperature (Deg C)") +
+  ggtitle("4.8 || Smoothed Cleaned Time Series Weekly Average Temperature (Deg C) || Oct,2005 - Dec,2013") +
+  scale_colour_manual(values=c("Data"="grey50","12x12-MA"="red"),
+                      breaks=c("Data","12x12-MA")) +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##The code below smoothes the time series with 12x12 MA and visualises time series data for 
+##ILI incidence data.
+
+autoplot(clean.ILI_Num_cases.timeseries, series="Data") +
+  autolayer(ma(ma(clean.ILI_Num_cases.timeseries,12),12), series="12x12-MA") +
+  xlab("Year") + ylab("ILI Incidence Count (per 100000)") +
+  ggtitle("4.9 || Smoothed Cleaned ILI Incidence Count (per 100000) || Oct,2005 - Dec,2013") +
+  scale_colour_manual(values=c("Data"="grey50","12x12-MA"="red"),
+                      breaks=c("Data","12x12-MA")) +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+
+```{r,fig.width=10}}
+
+###########################################################################################
+################################Decompose and Check Seasonality############################
+###########################################################################################
+
+##This code smoothes the time series and then decompose it to check seasonality in 
+##rainfall data.
+
+clean.rain.ts.ma.12.12 <- na.omit(ma(ma(clean.rainfall.timeseries,12),12))
+
+decomp <- stl(clean.rain.ts.ma.12.12, s.window="periodic")
+
+autoplot(decomp) + xlab("Year") + 
+  ggtitle("4.10 || Decomposed Time Series Weekly Average Rainfall (mm)") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##This code smoothes the time series and then decompose it to check seasonality in 
+##temperature data.
+
+clean.temp.ts.ma.12.12 <- na.omit(ma(ma(clean.mean.temp.timeseries,12),12))
+
+decomp_temp <- stl(clean.temp.ts.ma.12.12, s.window="periodic")
+
+autoplot(decomp_temp) + xlab("Year") + 
+  ggtitle("4.11 || Decomposed Time Series Weekly Average Temperature (Deg C)") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##This code smoothes the time series and then decompose it to check seasonality in 
+##ILI incidence data.
+
+clean.ILI.all.cnt <- na.omit(ma(ma(clean.ILI_Num_cases.timeseries,12),12))
+
+decomp_ILI_Num_cases <- stl(clean.ILI.all.cnt, s.window="periodic")
+
+autoplot(decomp_ILI_Num_cases) + xlab("Year") + 
+  ggtitle("4.12 || Decomposed Time Series ILI Incidence Count (per 100000)") +
+  theme_light() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+################################De-seasonalise Time Series Data############################
+###########################################################################################
+
+
+##The code below de-seasonalise the rainfall time series data with the lag of 52 
+##and log transformation. The time series is then visualised.
+
+#seasonal differencing
+diff.rain.ts.dif4 <- diff(log(clean.rain.ts.ma.12.12),lag = 52,differences = 4) 
+
+#differencing for stationarity
+diff.rain.ts.dif4.dif2 <- diff(diff.rain.ts.dif4,differences = 2) 
+
+#ACF and PACF plots to check seasonality
+
+Acf(diff.rain.ts.dif4.dif2,lag = 52)
+
+Pacf(diff.rain.ts.dif4.dif2,lag = 52)
+
+autoplot(diff.rain.ts.dif4.dif2) +   
+xlab("Year") + ylab("Weekly Average Rainfall (mm)") +
+  ggtitle("4.13 || Deseasonalised Time Series Weekly Average Rainfall (mm) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to = 2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+
+##The code below de-seasonalise the temperature time series data with the lag of 52 
+##and log transformation. The time series is then visualised.
+
+#seasonal differencing
+diff.temp.ts.dif4 <- diff(log(clean.temp.ts.ma.12.12),lag = 52,differences = 4) 
+
+#differencing for stationarity
+diff.temp.ts.dif4.dif2 <- diff(diff.temp.ts.dif4,differences = 2) 
+
+#ACF and PACF plots to check seasonality
+
+Acf(diff.temp.ts.dif4.dif2,lag = 104)
+
+Pacf(diff.temp.ts.dif4.dif2, lag = 104)
+
+autoplot(diff.temp.ts.dif4.dif2) + 
+  xlab("Year") + ylab("Weekly Average Temperature (Deg C)") +
+  ggtitle("4.14 || Deseasonalised Time Series Weekly Average Temperature (Deg C) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+###########################################################################################
+###########################################################################################
+
+##The code below de-seasonalise the ILI Incidence time series data with the lag of 52 
+##and then the time series is then visualised.
+
+#seasonal differencing
+diff.ILI.all.cnt.ts.dif4 <- diff(clean.ILI.all.cnt, lag = 52,differences = 4) 
+
+#differencing for stationarity
+diff.ILI.all.cnt.ts.dif4.dif2 <- diff(diff.ILI.all.cnt.ts.dif4,differences = 2) 
+
+#ACF and PACF plots to check seasonality
+
+Acf(diff.ILI.all.cnt.ts.dif4.dif2,lag = 104)
+
+Pacf(diff.ILI.all.cnt.ts.dif4.dif2, lag = 104)
+
+autoplot(diff.ILI.all.cnt.ts.dif4.dif2) + 
+  xlab("Year") + ylab("ILI Incidence Count (per 100000)") +
+  ggtitle("4.15 || Deseasonalised ILI Incidence Count (per 100000) || Oct,2005 - Dec,2013") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2006, to =  2013, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+#####################################Stationarity Test#####################################
+###########################################################################################
+
+##The code below checks all the time series for stationarity
+
+adf.test(diff.ILI.all.cnt.ts.dif4.dif2, alternative="stationary")
+
+kpss.test(diff.ILI.all.cnt.ts.dif4.dif2, null = "Trend")
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+###############################Creating Regressor Matrix###################################
+###############################For External Variables######################################
+
+##The code below created matrix out of temperature data and rainfall data 
+##which will be fed in the multivariate model
+
+rain_mat <- matrix(diff.rain.ts.dif4.dif2,nrow=143) #matrix for rain data
+
+temp_mat <- matrix(diff.temp.ts.dif4.dif2,nrow=143) #matrix for temperature data
+
+regressors <- cbind(rain_mat,temp_mat)
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+```{r}
+
+###########################################################################################
+###############################Preparing Test Data#########################################
+###########################################################################################
+
+##The same process is follwed as used above to prepare test data which will be used
+##later to compare the predicted values with original value, testing the accuracy
+##of prediction
+
+#################################Creating Time Series######################################
+
+##The code below creates and visualises time series for test data.
+
+tst.reg.rainfal.ts <- ts(test_data$weekly_rainfll_mean,c(2013,1),c(2016,21),52)
+  
+autoplot(tst.reg.rainfal.ts)
+
+tst.reg.temp.ts <-ts(test_data$wekly_temp_mean,c(2013,1),c(2016,21),52)
+
+autoplot(tst.reg.temp.ts)
+
+tst.reg.ili.count <- ts(test_data$ILINumberOfCases_per_100000,c(2013,1),c(2016,21),52)
+
+autoplot(tst.reg.ili.count)
+
+
+###########################################################################################
+###########################################################################################
+
+#################################Cleaning Time Series######################################
+
+##The code below cleanes and visualises time series data for test data.
+
+clean.tst.reg.ili.count <- tsclean(tst.reg.ili.count)
+
+autoplot(clean.tst.reg.ili.count)
+
+clean.tst.reg.rainfal.ts <- tsclean(tst.reg.rainfal.ts)
+
+autoplot(clean.tst.reg.rainfal.ts)
+
+clean.tst.reg.temp.ts <- tsclean(tst.reg.temp.ts)
+
+autoplot(clean.tst.reg.temp.ts)
+
+###########################################################################################
+###########################################################################################
+
+#################################Smoothing Time Series#####################################
+
+##The code below smoothes the time series with 12 MA for all test data.
+
+clean.tst.reg.ili.count.ts.ma.12 <- na.omit(ma(clean.tst.reg.ili.count,12))
+
+clean.tst.reg.rainfal.ts.ma.12 <- na.omit(ma(clean.tst.reg.rainfal.ts,12))
+
+clean.tst.reg.temp.ts.12 <- na.omit(ma(clean.tst.reg.temp.ts,12))
+
+###########################################################################################
+###########################################################################################
+
+################################Decompose and Check Seasonality############################
+
+##This code decomposes the time series to check seasonality in test data.
+
+decomp <- stl(clean.tst.reg.rainfal.ts.ma.12, s.window="periodic")
+
+plot(decomp)
+
+decomp_temp <- stl(clean.tst.reg.temp.ts.12, s.window="periodic")
+
+plot(decomp_temp)
+
+###########################################################################################
+###########################################################################################
+
+################################De-seasonalise Time Series Data############################
+
+##The code below de-seasonalise the test time series data with the lag of 52 
+##and log transformation.
+
+test.reg.diff.rain.ts.dif1 <- diff(log(clean.tst.reg.rainfal.ts.ma.12),lag = 52,
+                                   differences = 1)
+
+test.reg.diff.rain.ts.dif1.dif1 <- diff(test.reg.diff.rain.ts.dif1,differences = 1)
+
+plot(decompose(test.reg.diff.rain.ts.dif1.dif1))
+
+Acf(test.reg.diff.rain.ts.dif1.dif1,lag = 104)
+
+Pacf(test.reg.diff.rain.ts.dif1.dif1,lag = 104)
+
+test.reg.diff.temp.ts.dif1 <- diff(log(clean.tst.reg.temp.ts.12),lag = 52,
+                                   differences = 1)
+
+test.reg.diff.temp.ts.dif1.dif1 <- diff(test.reg.diff.temp.ts.dif1,differences = 1)
+
+plot(decompose(test.reg.diff.temp.ts.dif1.dif1))
+
+Acf(test.reg.diff.temp.ts.dif1.dif1,lag = 104)
+
+Pacf(test.reg.diff.temp.ts.dif1.dif1, lag = 104)
+
+test.reg.diff.ili.count.ts.dif1 <- diff(log(clean.tst.reg.ili.count.ts.ma.12),lag = 52,
+                                        differences = 1)
+
+test.reg.diff.ili.count.ts.dif1.dif1 <- diff(test.reg.diff.ili.count.ts.dif1,
+                                             differences = 1)
+
+plot(decompose(test.reg.diff.ili.count.ts.dif1.dif1))
+
+Acf(test.reg.diff.ili.count.ts.dif1.dif1,lag = 104)
+
+Pacf(test.reg.diff.ili.count.ts.dif1.dif1, lag = 104)
+
+#####################################Stationarity Test#####################################
+
+##The code below checks all the time series for stationarity
+
+adf.test(test.reg.diff.ili.count.ts.dif1.dif1, alternative="stationary")
+
+kpss.test(test.reg.diff.ili.count.ts.dif1.dif1,null = "Trend")
+
+###########################################################################################
+###########################################################################################
+
+###############################Creating Regressor Matrix###################################
+
+test.rainfall.reg <- matrix(test.reg.diff.rain.ts.dif1.dif1)
+
+test.temp.reg <- matrix(test.reg.diff.temp.ts.dif1.dif1)
+
+regressor.test <- cbind(test.rainfall.reg,test.temp.reg)
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r}
+
+###########################################################################################
+#################################Fitting Multivariate ARIMA model##########################
+###########################################################################################
+        
+##The code below fits the Multivariate ARIMA model on the training data 
+        
+fit_ili_all <- auto.arima(diff.ILI.all.cnt.ts.dif4.dif2,xreg=regressors,stepwise = FALSE,
+                          trace = TRUE,approximation=FALSE,seasonal=TRUE)
+
+##Checking the fitted mode using summary function
+
+summary(fit_ili_all)
+
+##The function helps to check the residual of the fitted ARIMA model
+
+tsdisplay(residuals(fit_ili_all), lag.max=20, main='ARIMA(1,0,3) Multivariate Model Residuals')
+
+##Manual test to check the goodness of fit
+
+Box.test(fit_ili_all$residuals,lag= 11, type="Ljung-Box")
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r,fig.width=7,fig.height=5}
+
+###########################################################################################
+################################Forecasting Multivariate ARIMA model#######################
+###########################################################################################
+
+##The code below forecasts the Multivariate ARIMA model and checks it's accuracy.
+
+predict_ili_all <- forecast(fit_ili_all,xreg=regressor.test,h=nrow(regressor.test))
+
+autoplot(predict_ili_all) + 
+  xlab("Year") + ylab("Smoothed Deseasonalised ILI Incidence Count (per 100000)") +
+  ggtitle("4.23 || Multivariate ARIMA Model Forecasting  || Jan,2010 - Dec,2015") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2010, to =  2015, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+accuracy(f=predict_ili_all,x=test.reg.diff.ili.count.ts.dif1.dif1)
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
+
+```{r, fig.height = 5}
+
+###########################################################################################
+##################################Fitting Univariate ARIMA model###########################
+###########################################################################################
+
+##The code below fits the Univariate ARIMA model on the training data 
+##and visulazing the prediction results
+
+fit_ili_all_univar <- auto.arima(diff.ILI.all.cnt.ts.dif4.dif2,stepwise = FALSE,
+                                 trace = TRUE,approximation=FALSE,seasonal=TRUE)
+
+tsdisplay(residuals(fit_ili_all_univar), lag.max=104, main='ARIMA(1,0,3) Model Residuals')
+
+Box.test(fit_ili_all_univar$residuals,lag= 52, type="Ljung-Box")
+
+fit_ili_all_univar_manual <- arima(diff.ILI.all.cnt.ts.dif4.dif2, order = c(1,1,5))
+
+summary(fit_ili_all_univar_manual)
+
+tsdisplay(residuals(fit_ili_all_univar_manual), lag.max=20, main='ARIMA(1,1,5) Univariate Model Residuals')
+
+tsdisplay(residuals(fit_ili_all_univar_manual), lag.max=15, main='Univariate Time Series Model Residue')
+
+Box.test(fit_ili_all_univar_manual$residuals,lag= 11, type="Ljung-Box")
+
+predict_ili_all_univar_man <- forecast(fit_ili_all_univar_manual,h=100)
+
+autoplot(predict_ili_all_univar_man) +
+   xlab("Year") + ylab("Smoothed Deseasonalised ILI Incidence Count (per 100000)") +
+  ggtitle("4.24 || Univariate ARIMA Model Forecasting  || Jan,2010 - Dec,2015") +
+  theme_light() +
+  scale_x_continuous(breaks = seq(from = 2010, to = 2015, by = 1)) + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+accuracy(f=predict_ili_all_univar_man,x=test.reg.diff.ili.count.ts.dif1.dif1)
+
+###########################################################################################
+###########################################################################################
+###########################################################################################
+
+```
+
